@@ -318,7 +318,13 @@ def main(
                                     "endTime": slot["endTime"],
                                     "spaceId": str(space_res_info["id"]),
                                     "spaceName": space_res_info["spaceName"],
-                                    "orderFee": int(trade["orderFee"]),
+                                    # Free venues may return orderFee=null. Treat it as zero,
+                                    # but still submit the order to the payment confirmation API.
+                                    "orderFee": (
+                                        int(trade["orderFee"])
+                                        if trade.get("orderFee") is not None
+                                        else 0
+                                    ),
                                 }
                                 for slot, trade in zip(
                                     target_slots_info,
@@ -445,16 +451,23 @@ def main(
                 data={"payType": "1", "venueTradeNo": trade_no, "isApp": "0"},
             )
             pay_fee = pay_data.get("payFee")
-            if not pay_fee:
+            # A free reservation is still confirmed through this endpoint and
+            # legitimately returns payFee=0.
+            if pay_fee is None:
                 raise Exception(f"payFee not found in pay response")
 
-            logger.info(
-                f"Successfully paid ¥{pay_fee} for the reservation order with campus card"
-            )
+            if pay_fee == 0:
+                logger.info("Successfully confirmed free reservation payment (¥0)")
+                payment_message = "已完成付款确认（金额 ¥0）"
+            else:
+                logger.info(
+                    f"Successfully paid ¥{pay_fee} for the reservation order with campus card"
+                )
+                payment_message = f"并成功用校园卡支付 {pay_fee} 元"
             logger.breathe()
             notifier.notify_message(
                 "[PKUAutoVenues] 预约成功 OvO",
-                f"已预约 {target_date} {selected_time}（{selected_space}场地），并成功用校园卡支付 {pay_fee} 元",
+                f"已预约 {target_date} {selected_time}（{selected_space}场地），{payment_message}",
             )
 
         except Exception as e:
@@ -512,11 +525,16 @@ if __name__ == "__main__":
 
     # Process venue
     venue_aliases = {
-        "qdb": "60",
-        "邱德拔": "60",
-        "54": "86",
-        "ws": "86",
-        "五四": "86",
+        "qdb羽毛球": "60",
+        "邱德拔羽毛球": "60",
+        "54羽毛球": "86",
+        "ws羽毛球": "86",
+        "五四羽毛球": "86",
+        "54篮球": "82",
+        "五四篮球": "82",
+        "邱德拔篮球": "68",
+        "qdb篮球": "68",
+        "二体": "108",
     }
     if args.venue in venue_aliases:
         venue = venue_aliases[args.venue]
