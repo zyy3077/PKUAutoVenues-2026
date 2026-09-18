@@ -253,3 +253,5 @@ echo 'cd ~/PKUAutoVenues-2026 && \
 -[ ] error handling (stop the loop except the target space is occupied)
 
 -[ ] UI
+
+-[ ] smarter interface (flexible input)
