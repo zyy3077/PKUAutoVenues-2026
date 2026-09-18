@@ -65,7 +65,7 @@ uv run main.py \
   --court-type full \
   --date 2026-09-20 \
   --times 17:00/2 \
-  --spaces 1 2
+  --spaces 北1,南1 北2,南2
 ```
 
 整场场地名称应以接口返回为准，例如 `1号`、`2号`；程序会将 `--spaces 1 2` 自动转换为 `1号`、`2号`。
