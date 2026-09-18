@@ -26,6 +26,7 @@ def main(
     target_date: str,
     target_times: list[tuple[str, int]],
     preferred_spaces: list[str],
+    reservation_type: str,
     skip_pay: bool,
 ):
     logger = Logger("main")
@@ -33,6 +34,10 @@ def main(
     logger.breathe()
 
     logger.info(f"Venue ID: {venue}")
+    reservation_type_title = {"-1": "半场", "1": "整场"}.get(
+        reservation_type, reservation_type
+    )
+    logger.info(f"Reservation type: {reservation_type_title} ({reservation_type})")
     logger.info(f"Target date: {target_date}")
     logger.info(f"Target times:")
     for begin_time, slots_count in target_times:
@@ -246,14 +251,26 @@ def main(
                 logger.breathe()
 
                 # Fetch reservation info
-                info_data = client.epe_get(
-                    "https://epe.pku.edu.cn/venue-server/api/reservation/day/info",
-                    params={
-                        "venueSiteId": venue,
-                        "searchDate": target_date,
-                    },
-                )
-
+                if (reservation_type == "1"):
+                    info_data = client.epe_get(
+                        "https://epe.pku.edu.cn/venue-server/api/reservation/day/info",
+                        params={
+                            "venueSiteId": venue,
+                            "searchDate": target_date,
+                            "reservationType": reservation_type,
+                        },
+                    )
+                else: 
+                    info_data = client.epe_get(
+                        "https://epe.pku.edu.cn/venue-server/api/reservation/day/info",
+                        params={
+                            "venueSiteId": venue,
+                            "searchDate": target_date,
+                        },
+                    )
+                
+                
+                logger.debug(f"info_data: {info_data}")
                 logger.debug(f"Target date: {target_date}")
                 logger.debug(f"Target times:")
                 for begin_time, slots_count in target_times:
@@ -325,6 +342,7 @@ def main(
                                         if trade.get("orderFee") is not None
                                         else 0
                                     ),
+                                    "venueSpaceGroupId": str(space_res_info["venueSpaceGroupId"]),
                                 }
                                 for slot, trade in zip(
                                     target_slots_info,
@@ -378,30 +396,57 @@ def main(
                     time.sleep(1 - elapsed)
 
                 # Submit reservation order
-                submit_data = client.epe_post(
-                    "https://epe.pku.edu.cn/venue-server/api/reservation/order/submit",
-                    data={
-                        "captchaVerification": encrypt_aes_ecb(
-                            captcha_token + "---" + recognized_points,
-                            captcha_secret_key,
-                        ),
-                        "captchaToken": captcha_token,
-                        "reservationOrderJson": json.dumps(
-                            [
-                                {"spaceId": trade["spaceId"], "timeId": trade["timeId"]}
-                                for trade in selected_trades
-                            ],
-                            separators=(",", ":"),
-                        ),
-                        "reservationDate": target_date,
-                        "weekStartDate": target_date,
-                        "reservationType": "-1",
-                        "orderPrice": total_fee,
-                        "orderPin": generate_order_pin(),
-                        "venueSiteId": venue,
-                        "phone": CONFIG["epe"]["phone"],
-                    },
-                )
+                # reservationOrderJson: [{"spaceId":"280,279","timeId":"13095","venueSpaceGroupId":"20"}]
+                if (reservation_type == "1"):
+                    submit_data = client.epe_post(
+                        "https://epe.pku.edu.cn/venue-server/api/reservation/order/submit",
+                        data={
+                            "captchaVerification": encrypt_aes_ecb(
+                                captcha_token + "---" + recognized_points,
+                                captcha_secret_key,
+                            ),
+                            "captchaToken": captcha_token,
+                            "reservationOrderJson": json.dumps(
+                                [
+                                    {"spaceId": trade["spaceId"], "timeId": trade["timeId"], "venueSpaceGroupId": trade["venueSpaceGroupId"]}
+                                    for trade in selected_trades
+                                ],
+                                separators=(",", ":"),
+                            ),
+                            "reservationDate": target_date,
+                            "weekStartDate": target_date,
+                            "reservationType": reservation_type,
+                            "orderPrice": total_fee,
+                            "orderPin": generate_order_pin(),
+                            "venueSiteId": venue,
+                            "phone": CONFIG["epe"]["phone"],
+                        },
+                    ) 
+                else:
+                    submit_data = client.epe_post(
+                        "https://epe.pku.edu.cn/venue-server/api/reservation/order/submit",
+                        data={
+                            "captchaVerification": encrypt_aes_ecb(
+                                captcha_token + "---" + recognized_points,
+                                captcha_secret_key,
+                            ),
+                            "captchaToken": captcha_token,
+                            "reservationOrderJson": json.dumps(
+                                [
+                                    {"spaceId": trade["spaceId"], "timeId": trade["timeId"]}
+                                    for trade in selected_trades
+                                ],
+                                separators=(",", ":"),
+                            ),
+                            "reservationDate": target_date,
+                            "weekStartDate": target_date,
+                            "reservationType": reservation_type,
+                            "orderPrice": total_fee,
+                            "orderPin": generate_order_pin(),
+                            "venueSiteId": venue,
+                            "phone": CONFIG["epe"]["phone"],
+                        },
+                    )
 
                 trade_id = submit_data.get("id")
                 trade_no = submit_data.get("tradeNo")
@@ -517,6 +562,15 @@ if __name__ == "__main__":
         help="Preferred space names (optional), e.g. 4号 5 (abbr for 5号)",
     )
     parser.add_argument(
+        "--type"
+        "--reservation-type",
+        "--court-type",
+        dest="reservation_type",
+        default="half",
+        choices=["half", "full", "半场", "整场", "-1", "1"],
+        help="Reservation type for venues that support it: half/半场 (default) or full/整场",
+    )
+    parser.add_argument(
         "--skip-pay",
         action="store_true",
         help="Skip auto payment, need to manually pay within 10 minutes",
@@ -592,10 +646,20 @@ if __name__ == "__main__":
         except ValueError:
             preferred_spaces.append(s)
 
+    reservation_type = {
+        "half": "-1",
+        "半场": "-1",
+        "-1": "-1",
+        "full": "1",
+        "整场": "1",
+        "1": "1",
+    }[args.reservation_type]
+
     main(
         venue=venue,
         target_date=target_date,
         target_times=target_times,
         preferred_spaces=preferred_spaces,
+        reservation_type=reservation_type,
         skip_pay=args.skip_pay,
     )
