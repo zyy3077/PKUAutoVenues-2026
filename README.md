@@ -1,16 +1,74 @@
 # PKUAutoVenues-2026
 
-> 我想预约 2026 年 5 月 3 日的羽毛球场，场馆在五四体育中心，最好能从 19:00 开始连打两小时（预约连续的两场），抢不到的话只打一小时也行，最好是在 9 号或 8 号场地
+## Example
+
+下面的命令示例预约 2026 年 9 月 19 日第二体育馆室外篮球场（场馆 ID `108`）的整场，目标时段为 `17:00-18:00`，并优先选择 1 号或 2 号场地：
 
 ```bash
-echo 'cd ~/PKUAutoVenues-2026 && \
-      uv run main.py \
-        --venue 五四 \
-        --date 2026-05-03 \
-        --times 19:00/2 19:00 \
-        --spaces 9 8' \
-| at 11:50 2026-04-30
+uv run main.py \
+  --venue 二体 \
+  --court-type 全场 \
+  --date 2026-09-19 \
+  --times 17:00
 ```
+
+参数说明：
+
+- `--venue`：场馆名称、别名或 ID，例如 `108`。
+- `--court-type`：预约类型。`half`/`半场` 表示半场（默认），`full`/`整场` 表示整场；不支持该选项的场馆可省略。
+- `--date`：预约日期，格式为 `YYYY-MM-DD`；也可以填写 `1`~`7`，表示下一个对应的星期一至星期日。
+- `--times`：目标开始时间。`17:00` 表示预约一个时段，`19:00/2` 表示从 19:00 开始连续预约两个时段；可以填写多个备选时间。
+- `--spaces`：优先选择的场地，可选；不填写时会从可用场地中随机选择。数字会自动转换为带“号”的场地名称，例如 `1` 等同于 `1号`。
+- `--skip-pay`：可选参数。指定后跳过自动付款，需要在订单有效期内手动完成付款。
+
+运行前请先完成 `config.ini` 配置。查看全部参数：
+
+```bash
+uv run main.py --help
+```
+
+更多运行示例：
+
+### 连续预约两个时段
+
+下面的命令从 `19:00` 开始连续预约两个时段（通常即 19:00-20:00 和 20:00-21:00）：
+
+```bash
+uv run main.py \
+  --venue 五四篮球 \
+  --date 2026-09-20 \
+  --times 19:00/2 \
+  --spaces 北5
+```
+
+`19:00/2` 中的 `/2` 表示连续两个时段；如果写成 `19:00/3`，则表示连续三个时段。
+
+### 多个备选开始时间
+
+下面的命令优先尝试 `15:00`，如果该时段没有可用场地，再尝试 `20:00`。这两个时间不是连续预约：
+
+```bash
+uv run main.py \
+  --venue 五四羽毛球 \
+  --date 2026-09-20 \
+  --times 15:00 20:00 \
+  --spaces 4 5
+```
+
+### 整场连续预约两个时段
+
+对于支持“半场/整场”切换的场馆，可以使用 `--court-type full`。下面的命令预约 108 号场馆的整场，并从 `17:00` 开始连续两个时段：
+
+```bash
+uv run main.py \
+  --venue 二体 \
+  --court-type full \
+  --date 2026-09-20 \
+  --times 17:00/2 \
+  --spaces 1 2
+```
+
+整场场地名称应以接口返回为准，例如 `1号`、`2号`；程序会将 `--spaces 1 2` 自动转换为 `1号`、`2号`。
 
 <img src="assets/preview.png" alt="Preview">
 
@@ -18,11 +76,9 @@ echo 'cd ~/PKUAutoVenues-2026 && \
 
 ## 致谢
 
-- [zyHan2077/EpeAutoReserve](https://github.com/zyHan2077/EpeAutoReserve)：大佬的文档为我指点迷津
+- codebase from [goudanZ1/PKUAutoVenues-2026](https://github.com/goudanZ1/PKUAutoVenues-2026)
 
-- [qqworld-tutu/PKUautoBookingVenues-fixed-by-cq-tutu](https://github.com/qqworld-tutu/PKUautoBookingVenues-fixed-by-cq-tutu)
-
-## 如何使用（<a href="https://www.kimi.com/_prefill_chat?prefill_prompt=请阅读一下 https://github.com/goudanZ1/PKUAutoVenues-2026 这个项目，我应该如何使用它？&send_immediately=true&force_search=true">Chat with Kimi</a>）
+## 如何使用（<a href="https://www.kimi.com/_prefill_chat?prefill_prompt=请阅读一下 https://github.com/zyy3077/PKUAutoVenues-2026 这个项目，我应该如何使用它？&send_immediately=true&force_search=true">Chat with Kimi</a>）
 
 1. 安装 [uv](https://docs.astral.sh/uv/)
 
@@ -33,7 +89,7 @@ echo 'cd ~/PKUAutoVenues-2026 && \
 2. 将项目 clone 到本地
 
    ```bash
-   git clone https://github.com/goudanZ1/PKUAutoVenues-2026
+   git clone https://github.com/zyy3077/PKUAutoVenues-2026
    cd PKUAutoVenues-2026
    ```
 
@@ -194,5 +250,6 @@ echo 'cd ~/PKUAutoVenues-2026 && \
 
 ## TODO
 
-- preflight
-- helper
+-[ ] error handling (stop the loop except the target space is occupied)
+
+-[ ] UI
