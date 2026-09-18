@@ -49,7 +49,7 @@ def main(
     logger.info(f"Auto payment with campus card: {not skip_pay}")
     logger.breathe()
 
-    release_time = get_release_time(target_date)
+    release_time = get_release_time(target_date, days=1 if venue in ["82", "108"] else 3)
     login_time = release_time - timedelta(minutes=1)
     # captcha_time = release_time - timedelta(seconds=15)
 

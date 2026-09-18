@@ -13,11 +13,11 @@ def get_next_weekday(weekday: int) -> str:
     return target.strftime("%Y-%m-%d")
 
 
-def get_release_time(target_date: str) -> datetime:
+def get_release_time(target_date: str, days=3) -> datetime:
     """根据 target_date 反推预约名额放出的时间（三天前的中午 12 点）"""
     d = datetime.strptime(target_date, "%Y-%m-%d")
     tz = ZoneInfo("Asia/Shanghai")
-    return datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=tz) - timedelta(days=3)
+    return datetime(d.year, d.month, d.day, 12, 0, 0, tzinfo=tz) - timedelta(days=days)
 
 
 def wait_until(dt: datetime, logger: Logger, label: str, strict: bool):
