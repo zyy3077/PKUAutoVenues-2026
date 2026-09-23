@@ -653,6 +653,8 @@ if __name__ == "__main__":
     # Process spaces
     preferred_spaces = []
     explicit_type = args.reservation_type
+    if venue == "108" and explicit_type == "auto":
+        explicit_type = "half"
     for s in args.spaces:
         if re.fullmatch(r"\d+", s):
             if explicit_type in ("full", "整场", "1"):
