@@ -21,6 +21,10 @@ from utils.time import get_next_weekday, get_release_time, wait_until
 from utils.config import LOGS_DIR, LOG_FILE, CONFIG
 
 
+def report_result(success: bool, message: str) -> None:
+    print("PKU_RESULT " + json.dumps({"success": success, "message": message}, ensure_ascii=False), flush=True)
+
+
 def main(
     venue: str,
     target_date: str,
@@ -362,9 +366,13 @@ def main(
                     logger.breathe()
 
                     for space in preferred_spaces:
-                        if space in available_space_to_trades:
-                            selected_space = space
-                            break
+                        for candidate in space:
+                            if candidate in available_space_to_trades:
+                                selected_space = candidate
+                                break
+                        else:
+                            continue
+                        break
                     else:
                         selected_space = random.choice(
                             list(available_space_to_trades.keys())
@@ -482,6 +490,7 @@ def main(
         """
 
         if skip_pay:
+            report_result(True, f"已成功预约 {target_date} {selected_time}（{selected_space}场地），请在十分钟内手动完成支付")
             logger.info("Skipped auto payment")
             logger.breathe()
             notifier.notify_message(
@@ -510,12 +519,14 @@ def main(
                 )
                 payment_message = f"并成功用校园卡支付 {pay_fee} 元"
             logger.breathe()
+            report_result(True, f"已预约 {target_date} {selected_time}（{selected_space}场地），{payment_message}")
             notifier.notify_message(
                 "[PKUAutoVenues] 预约成功 OvO",
                 f"已预约 {target_date} {selected_time}（{selected_space}场地），{payment_message}",
             )
 
         except Exception as e:
+            report_result(True, f"已成功预约 {target_date} {selected_time}（{selected_space}场地），自动付款失败，请手动支付：{e}")
             logger.error(f"Failed to pay for the reservation order: {e}")
             logger.breathe()
             notifier.notify_message(
@@ -524,6 +535,7 @@ def main(
             )
 
     except Exception as e:
+        report_result(False, str(e))
         logger.error(str(e))
         logger.breathe()
         notifier.notify_message("[PKUAutoVenues] 预约失败 QAQ", str(e))
@@ -566,8 +578,8 @@ if __name__ == "__main__":
         "--reservation-type",
         "--court-type",
         dest="reservation_type",
-        default="half",
-        choices=["half", "full", "半场", "整场", "-1", "1"],
+        default="auto",
+        choices=["auto", "half", "full", "半场", "整场", "-1", "1"],
         help="Reservation type for venues that support it: half/半场 (default) or full/整场",
     )
     parser.add_argument(
@@ -640,13 +652,20 @@ if __name__ == "__main__":
 
     # Process spaces
     preferred_spaces = []
+    explicit_type = args.reservation_type
     for s in args.spaces:
-        try:
-            preferred_spaces.append(f"{int(s)}号")
-        except ValueError:
-            preferred_spaces.append(s)
+        if re.fullmatch(r"\d+", s):
+            if explicit_type in ("full", "整场", "1"):
+                preferred_spaces.append([f"北{s},南{s}", f"北{s}", f"南{s}"])
+            elif explicit_type in ("half", "半场", "-1"):
+                preferred_spaces.append([f"北{s}", f"南{s}"])
+            else:
+                preferred_spaces.append([f"{int(s)}号"])
+        else:
+            preferred_spaces.append([s])
 
     reservation_type = {
+        "auto": "-1",
         "half": "-1",
         "半场": "-1",
         "-1": "-1",
