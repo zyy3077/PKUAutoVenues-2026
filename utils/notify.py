@@ -12,8 +12,13 @@ class Notifier:
 
     def __init__(self):
         self._method = CONFIG.get("notify", "method", fallback="")
+        self._proxy = CONFIG.get("notify", "proxy", fallback="").strip()
         self._client = Client(self._method)
         self._logger = Logger("notifier")
+
+    def _post_notification(self, url: str, data: dict):
+        proxies = {"http": self._proxy, "https": self._proxy} if self._proxy else None
+        return self._client.post(url, data=data, timeout=60.0, proxies=proxies)
 
     def notify_message(self, title: str, content: str) -> bool:
         """成功返回 True，失败返回 False，never raise Exception，不打断主流程"""
@@ -93,7 +98,7 @@ class Notifier:
             )
         uid = match.group(1)
 
-        response = self._client.post(
+        response = self._post_notification(
             f"https://{uid}.push.ft07.com/send/{sendkey}.send",
             data={
                 "title": title,
@@ -101,7 +106,6 @@ class Notifier:
                 "short": content,  # 推送消息卡片的内容，这里直接提供原始消息内容，显示时会截取前若干个字符作为预览
                 "tags": "PKUAutoVenues",
             },
-            timeout=60.0,
         )
 
         response_data = response.json()
@@ -114,7 +118,7 @@ class Notifier:
     def _sct(self, title: str, content: str):
         sendkey = CONFIG["notify:sct"]["sendkey"]
 
-        response = self._client.post(
+        response = self._post_notification(
             f"https://sctapi.ftqq.com/{sendkey}.send",
             data={
                 "title": title,
@@ -122,7 +126,6 @@ class Notifier:
                 "noip": "1",  # 隐藏调用 IP
                 "channel": "9",  # 指定消息通道为方糖服务号
             },
-            timeout=60.0,
         )
 
         response_data = response.json()
@@ -140,7 +143,7 @@ class Notifier:
     def _bark(self, title: str, content: str):
         sendkey = CONFIG["notify:bark"]["sendkey"]
 
-        response = self._client.post(
+        response = self._post_notification(
             f"https://api.day.app/{sendkey}",
             data={
                 "title": title,
@@ -148,7 +151,6 @@ class Notifier:
                 "group": "PKUAutoVenues",
                 "badge": "1",  # 角标提醒
             },
-            timeout=60.0,
         )
 
         response_data = response.json()
