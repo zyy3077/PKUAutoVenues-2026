@@ -20,6 +20,8 @@ Web UI 使用 tmux 运行后台预约任务。Ubuntu / Debian 可执行：
 sudo apt install tmux
 ```
 
+Web UI 创建的预约任务默认直连场馆系统，不使用启动 Web 服务时的 HTTP/HTTPS 代理环境变量。
+
 首次运行时复制配置文件，已有 `config.ini` 时直接编辑，避免覆盖：
 
 ```bash

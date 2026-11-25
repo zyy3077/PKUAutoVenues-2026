@@ -21,6 +21,10 @@ from urllib.parse import parse_qs, urlparse
 ROOT = Path(__file__).resolve().parent
 tasks: dict[str, dict] = {}
 lock = threading.Lock()
+PROXY_ENV_VARS = (
+    "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+    "http_proxy", "https_proxy", "all_proxy",
+)
 
 
 def start_task(payload: dict) -> dict:
@@ -40,15 +44,18 @@ def start_task(payload: dict) -> dict:
         command += ["--court-type", "half" if court_type == "auto" else court_type]
     if payload.get("skip_pay"):
         command.append("--skip-pay")
-    env = os.environ.copy()
+    env = {key: value for key, value in os.environ.items() if key not in PROXY_ENV_VARS}
     env["TZ"] = "Asia/Shanghai"
     session = f"pku-{task_id}"
     task_dir = ROOT / "logs" / "web-tasks"
     task_dir.mkdir(parents=True, exist_ok=True)
     output_path = task_dir / f"{task_id}.log"
     exit_path = task_dir / f"{task_id}.exit"
-    script = ("TZ=Asia/Shanghai PYTHONUNBUFFERED=1 " + shlex.join(command)
-              + " > " + shlex.quote(str(output_path)) + " 2>&1; "
+    # The tmux server can retain an older environment, so clear proxies in the
+    # task command as well as in the environment passed to tmux.
+    command_line = ("env " + " ".join(f"-u {key}" for key in PROXY_ENV_VARS)
+                    + " TZ=Asia/Shanghai PYTHONUNBUFFERED=1 " + shlex.join(command))
+    script = (command_line + " > " + shlex.quote(str(output_path)) + " 2>&1; "
               + "printf '%s' \"$?\" > " + shlex.quote(str(exit_path)))
     subprocess.run(["tmux", "new-session", "-d", "-s", session, script],
                    cwd=ROOT, env=env, check=True)
