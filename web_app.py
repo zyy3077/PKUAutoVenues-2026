@@ -55,9 +55,10 @@ def start_task(payload: dict) -> dict:
     # task command as well as in the environment passed to tmux.
     command_line = ("env " + " ".join(f"-u {key}" for key in PROXY_ENV_VARS)
                     + " TZ=Asia/Shanghai PYTHONUNBUFFERED=1 " + shlex.join(command))
-    script = (command_line + " > " + shlex.quote(str(output_path)) + " 2>&1; "
-              + "printf '%s' \"$?\" > " + shlex.quote(str(exit_path)))
-    subprocess.run(["tmux", "new-session", "-d", "-s", session, script],
+    script = (command_line + " 2>&1 | tee " + shlex.quote(str(output_path)) + "; "
+              + "code=${PIPESTATUS[0]}; printf '%s' \"$code\" > "
+              + shlex.quote(str(exit_path)))
+    subprocess.run(["tmux", "new-session", "-d", "-s", session, "bash", "-o", "pipefail", "-c", script],
                    cwd=ROOT, env=env, check=True)
     task = {"id": task_id, "status": "running", "command": command,
             "tmux_session": session,
